@@ -25,7 +25,9 @@ export function SignInMethodsContainer(props: {
   };
 }) {
   const router = useRouter();
-  const nextPath = useSearchParams().get('next') ?? props.paths.home;
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get('next');
+  const nextPath = nextParam ?? props.paths.home;
 
   const redirectUrl = isBrowser()
     ? new URL(props.paths.callback, window?.location.origin).toString()

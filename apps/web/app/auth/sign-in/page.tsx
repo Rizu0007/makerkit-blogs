@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { LogIn, ArrowLeft } from 'lucide-react';
+import { redirect } from 'next/navigation';
 
 import { SignInMethodsContainer } from '@kit/auth/sign-in';
 import { Heading } from '@kit/ui/heading';
 import { Trans } from '@kit/ui/trans';
+import { getSupabaseServerClient } from '@kit/supabase/server-client';
 
 import authConfig from '~/config/auth.config';
 import pathsConfig from '~/config/paths.config';
@@ -24,7 +26,16 @@ const paths = {
   home: pathsConfig.app.home,
 };
 
-function SignInPage() {
+async function SignInPage(props: { searchParams: Promise<{ next?: string }> }) {
+  const supabase = getSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // If user is already logged in, redirect to next or home
+  if (user) {
+    const { next } = await props.searchParams;
+    const redirectTo = next || pathsConfig.app.home;
+    redirect(redirectTo);
+  }
   return (
     <div className="w-full max-w-md mx-auto space-y-6 py-6">
       {/* Back to home link */}

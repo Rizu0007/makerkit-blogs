@@ -36,42 +36,61 @@ export function useAuthChangeListener({
   onEvent?: (event: AuthChangeEvent, user: Session | null) => void;
 }) {
   const client = useSupabase();
-  const pathName = usePathname();
 
   useEffect(() => {
     // keep this running for the whole session unless the component was unmounted
     const listener = client.auth.onAuthStateChange((event, user) => {
+      // ALWAYS use window.location.pathname - don't trust usePathname() during hydration
+      if (typeof window === 'undefined') {
+        return; // Skip on server-side
+      }
+
+      const currentPath = window.location.pathname;
+
       if (onEvent) {
         onEvent(event, user);
       }
 
-      // log user out if user is falsy
-      // and if the current path is a private route
+      // Don't redirect if we're already on an auth page
+      const isOnAuthPage = AUTH_PATHS.some((path) => currentPath.startsWith(path));
+
+      if (isOnAuthPage) {
+        // Only handle SIGNED_IN event on auth pages
+        if (event === 'SIGNED_IN' && user) {
+          // Check if there's a 'next' parameter in the URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const nextPath = urlParams.get('next');
+
+          if (nextPath) {
+            window.location.assign(nextPath);
+            return;
+          }
+
+          // No next parameter, redirect to app home
+          window.location.assign(appHomePath);
+        }
+        return;
+      }
+
+      // log user out if user is falsy and if the current path is a private route
       const shouldRedirectUser =
-        !user && isPrivateRoute(pathName, privatePathPrefixes);
+        !user && isPrivateRoute(currentPath, privatePathPrefixes);
 
       if (shouldRedirectUser) {
         // send user away when signed out
         window.location.assign('/');
-
         return;
       }
 
       // revalidate user session when user signs in or out
       if (event === 'SIGNED_OUT') {
-        // sometimes Supabase sends SIGNED_OUT event
-        // but in the auth path, so we ignore it
-        if (AUTH_PATHS.some((path) => pathName.startsWith(path))) {
-          return;
-        }
-
         window.location.reload();
       }
     });
 
     // destroy listener on un-mounts
     return () => listener.data.subscription.unsubscribe();
-  }, [client.auth, pathName, appHomePath, privatePathPrefixes, onEvent]);
+  }, [client.auth, appHomePath, privatePathPrefixes, onEvent]);
 }
 
 /**

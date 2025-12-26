@@ -1,47 +1,25 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { Button } from '@kit/ui/button';
-import { Card, CardContent } from '@kit/ui/card';
-import { useUser } from '@kit/supabase/hooks/use-user';
+import { redirect } from 'next/navigation';
 import { ArrowLeft, FileText, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { CreatePostForm } from './_components/create-post-form';
+import { getSupabaseServerClient } from '@kit/supabase/server-client';
 
-export default function CreatePostPage() {
-  const router = useRouter();
-  const { data: userClaims, isLoading: isLoadingUser } = useUser();
+// Force this page to be dynamic (not cached)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-  const userId = userClaims?.sub;
+export default async function CreatePostPage() {
+  const supabase = getSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // Show loading state while checking authentication
-  if (isLoadingUser) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground">Loading...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  // Redirect to sign-in with return URL if not authenticated
+  if (!user) {
+    console.log('[CREATE POST] No user, redirecting to sign-in');
+    redirect('/auth/sign-in?next=/home/posts/new');
   }
 
-  // Redirect to sign-in if not authenticated
-  if (!userId) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <Card>
-          <CardContent className="p-8 text-center space-y-4">
-            <p className="text-muted-foreground">Please log in to create a post</p>
-            <Button onClick={() => router.push('/auth/sign-in')}>
-              Sign In
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  console.log('[CREATE POST] User authenticated:', user.id);
+  const userId = user.id;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
@@ -77,7 +55,7 @@ export default function CreatePostPage() {
           </div>
 
           {/* Form Component */}
-          <CreatePostForm userId={userId} userEmail={userClaims?.email} />
+          <CreatePostForm userId={userId} userEmail={user.email} />
 
         </div>
       </div>
